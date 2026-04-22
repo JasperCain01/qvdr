@@ -1,0 +1,39 @@
+url: https://yourname.github.io/qvdr/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+home:
+  title: "qvdr — Read QVD Files in R"
+  description: "Read QlikView and Qlik Sense QVD files into R tibbles"
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/yourname/qvdr
+
+reference:
+  - title: "Reading QVD files"
+    desc: "Main functions for loading QVD data into R"
+    contents:
+      - read_qvd
+  - title: "Inspecting QVD files"
+    desc: "Fast metadata access without loading data"
+    contents:
+      - qvd_metadata
+      - qvd_fields
+      - qvd_schema
+
+articles:
+  - title: "Getting started"
+    navbar: ~
+    contents:
+      - getting-started
+
+news:
+  - one_page: true

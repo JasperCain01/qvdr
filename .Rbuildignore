@@ -1,0 +1,10 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^\.DS_Store$
+^codecov\.yml$
+^cran-comments\.md$
+^revdep$
