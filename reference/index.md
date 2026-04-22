@@ -1,0 +1,19 @@
+# Package index
+
+## Reading QVD files
+
+Main functions for loading QVD data into R
+
+- [`read_qvd()`](https://yourname.github.io/qvdr/reference/read_qvd.md)
+  : Read a QVD file into a tibble
+
+## Inspecting QVD files
+
+Fast metadata access without loading data
+
+- [`qvd_metadata()`](https://yourname.github.io/qvdr/reference/qvd_metadata.md)
+  : Read QVD file metadata only (fast, no data loaded)
+- [`qvd_fields()`](https://yourname.github.io/qvdr/reference/qvd_fields.md)
+  : List field names in a QVD file
+- [`qvd_schema()`](https://yourname.github.io/qvdr/reference/qvd_schema.md)
+  : Get the full schema of a QVD file as a tibble
