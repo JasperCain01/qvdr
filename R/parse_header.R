@@ -76,17 +76,19 @@ parse_qvd_header <- function(con) {
   )
 
   # ---- Top-level metadata ----
+  # Search from root element to find direct children (avoids matching nested per-field elements)
+  root <- xml2::xml_root(doc)
   xtext <- function(xpath) {
-    node <- xml2::xml_find_first(doc, xpath)
+    node <- xml2::xml_find_first(root, xpath)
     if (inherits(node, "xml_missing")) return(NA_character_)
     xml2::xml_text(node)
   }
 
-  table_name       <- xtext(".//TableName")
-  created_date     <- xtext(".//CreatedDate")
-  n_records        <- as.integer(xtext(".//NoOfRecords"))
-  record_byte_size <- as.integer(xtext(".//RecordByteSize"))
-  symbol_byte_size <- as.integer(xtext(".//Offset"))  # Total symbol section size
+  table_name       <- xtext("TableName")
+  created_date     <- xtext("CreateUtcTime") %||% xtext("CreatedDate")
+  n_records        <- as.integer(xtext("NoOfRecords"))
+  record_byte_size <- as.integer(xtext("RecordByteSize"))
+  symbol_byte_size <- as.integer(xtext("Offset"))
 
   # ---- Field metadata ----
   field_nodes <- xml2::xml_find_all(doc, ".//QvdFieldHeader")
@@ -105,6 +107,10 @@ parse_qvd_header <- function(con) {
     tags_nodes <- xml2::xml_find_all(f, ".//Tags/String")
     tags       <- if (length(tags_nodes) > 0) xml2::xml_text(tags_nodes) else character(0)
 
+    # Type can be stored as direct child (test files) or in NumberFormat/Type (real QVDs)
+    type_raw <- ftext(f, "Type")
+    if (is.na(type_raw)) type_raw <- ftext(f, "NumberFormat/Type")
+
     list(
       name             = ftext(f, "FieldName"),
       bit_offset       = as.integer(ftext(f, "BitOffset")),
@@ -113,7 +119,7 @@ parse_qvd_header <- function(con) {
       num_symbols      = as.integer(ftext(f, "NoOfSymbols")),
       offset           = as.integer(ftext(f, "Offset")),   # byte offset in symbol section
       length           = as.integer(ftext(f, "Length")),   # byte length in symbol section
-      type             = ftext(f, "Type"),                  # "ASCII", "INTEGER", "REAL", etc.
+      type             = type_raw,                          # "ASCII", "INTEGER", "REAL", etc.
       tags             = tags,                              # e.g. "$date", "$timestamp"
       number_format    = ftext(f, "NumberFormat/Type"),
       has_undefined    = identical(ftext(f, "HasUndefined"), "true")
