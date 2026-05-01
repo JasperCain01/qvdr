@@ -256,10 +256,10 @@ encode_records <- function(index_mat, bit_widths, n_records, record_byte_size) {
       while (remaining > 0L) {
         bits_in_this_byte <- min(remaining, 8L - bp)
         mask_val          <- bitwAnd(val, bitwShiftL(1L, bits_in_this_byte) - 1L)
-        buf[byte_pos + 1L] <- bitwOr(
+        buf[byte_pos + 1L] <- as.raw(bitwOr(
           as.integer(buf[byte_pos + 1L]),
           as.integer(as.raw(bitwShiftL(mask_val, bp)))
-        )
+        ))
         val       <- bitwShiftR(val, bits_in_this_byte)
         remaining <- remaining - bits_in_this_byte
         byte_pos  <- byte_pos + 1L

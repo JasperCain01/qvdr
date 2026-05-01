@@ -16,11 +16,13 @@
 #' @param header       Parsed header from `parse_qvd_header()`.
 #' @param symbol_table Named list of symbol vectors from `parse_qvd_symbols()`.
 #' @param col_select   Character vector of column names to return, or NULL for all.
+#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
 #' @param verbose      Logical; print progress bar.
 #' @return A tibble.
 #' @keywords internal
 parse_qvd_data <- function(con, header, symbol_table,
                             col_select = NULL,
+                            numeric_as_num = TRUE,
                             verbose    = TRUE) {
 
   n_records        <- header$n_records
@@ -85,7 +87,7 @@ parse_qvd_data <- function(con, header, symbol_table,
     )
 
     # Map indices to symbol values
-    result[[i]] <- map_indices_to_symbols(indices, syms, f)
+    result[[i]] <- map_indices_to_symbols(indices, syms, f, numeric_as_num)
 
     if (!is.null(pb)) cli::cli_progress_update(id = pb)
   }
@@ -101,9 +103,10 @@ parse_qvd_data <- function(con, header, symbol_table,
 #' @param indices Integer vector of 1-based symbol indices (NA = null).
 #' @param syms    Symbol vector for this field.
 #' @param field   Field metadata list.
+#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
 #' @return A typed R vector.
 #' @keywords internal
-map_indices_to_symbols <- function(indices, syms, field) {
+map_indices_to_symbols <- function(indices, syms, field, numeric_as_num = TRUE) {
   if (length(syms) == 0L) {
     return(rep(NA_character_, length(indices)))
   }
@@ -118,7 +121,7 @@ map_indices_to_symbols <- function(indices, syms, field) {
   raw_vec <- syms[indices]
 
   # Apply type coercion based on the symbol vector type
-  coerce_column(raw_vec, field)
+  coerce_column(raw_vec, field, numeric_as_num)
 }
 
 
@@ -129,9 +132,10 @@ map_indices_to_symbols <- function(indices, syms, field) {
 #'
 #' @param vec   Vector of raw symbol values (integer, double, or character).
 #' @param field Field metadata list.
+#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
 #' @return A typed R vector.
 #' @keywords internal
-coerce_column <- function(vec, field) {
+coerce_column <- function(vec, field, numeric_as_num = TRUE) {
   tags   <- field$tags   %||% character(0)
   qtype  <- field$type   %||% ""
   nfmt   <- field$number_format %||% ""
@@ -139,16 +143,16 @@ coerce_column <- function(vec, field) {
   # Already typed from symbol parsing
   if (is.integer(vec) || is.double(vec)) {
     # Date: Qlik stores dates as days since 1899-12-30 (Excel epoch)
-    if ("$date" %in% tags || nfmt == "D") {
+    if ("$date" %in% tags || isTRUE(nfmt == "DATE")) {
       return(as.Date(vec, origin = "1899-12-30"))
     }
     # Timestamp: days + fraction of day since 1899-12-30
-    if ("$timestamp" %in% tags || nfmt == "DT") {
+    if ("$timestamp" %in% tags || isTRUE(nfmt == "TIMESTAMP")) {
       secs <- as.double(vec) * 86400
       return(as.POSIXct(secs, origin = "1899-12-30", tz = "UTC"))
     }
     # Time: fraction of day
-    if ("$time" %in% tags || nfmt == "T") {
+    if ("$time" %in% tags || isTRUE(nfmt == "TIME")) {
       return(as.double(vec) * 86400)  # seconds since midnight
     }
     return(vec)
@@ -162,8 +166,8 @@ coerce_column <- function(vec, field) {
       if (mean(is.na(parsed)) <= 0.1) return(parsed)  # allow 10% parse failures
     }
 
-    # Try numeric coercion for numeric QVD types stored as string
-    if (qtype %in% c("INTEGER", "REAL", "FIX", "MONEY")) {
+    # Try numeric coercion for numeric QVD types stored as string (only if numeric_as_num = TRUE)
+    if (numeric_as_num && qtype %in% c("INTEGER", "REAL", "FIX", "MONEY")) {
       num <- suppressWarnings(as.numeric(vec))
       if (mean(is.na(num)) <= mean(is.na(vec))) return(num)
     }

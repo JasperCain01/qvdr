@@ -93,6 +93,7 @@ read_qvd <- function(path,
     header       = header,
     symbol_table = symbol_table,
     col_select   = col_select,
+    numeric_as_num = numeric_as_num,
     verbose      = verbose
   )
 

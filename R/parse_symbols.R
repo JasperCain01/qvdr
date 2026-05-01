@@ -81,7 +81,8 @@ parse_qvd_symbols <- function(con, fields, symbol_byte_size,
     dominant <- determine_dominant_type(types, f)
 
     # Treat DUAL types as their underlying numeric type
-    if (dominant %in% c("integer", "dual_int") && int_as_int) {
+    # When numeric_as_num = FALSE, return all numeric columns as character (per docstring)
+    if (dominant %in% c("integer", "dual_int") && int_as_int && numeric_as_num) {
       result[[i]] <- int_vals
 
     } else if (dominant %in% c("double", "dual_dbl") && numeric_as_num) {
