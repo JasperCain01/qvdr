@@ -1,6 +1,7 @@
 # Getting Started with qvdr
 
 ``` r
+
 library(qvdr)
 ```
 
@@ -26,6 +27,7 @@ bit-extraction inner loop.
 ### Reading a QVD file
 
 ``` r
+
 df <- read_qvd("path/to/file.qvd")
 ```
 
@@ -45,6 +47,7 @@ Load only the columns you need — this skips bit-extraction for unneeded
 fields:
 
 ``` r
+
 df <- read_qvd("Sales.qvd", col_select = c("SalesDate", "Amount", "Region"))
 ```
 
@@ -53,12 +56,14 @@ df <- read_qvd("Sales.qvd", col_select = c("SalesDate", "Amount", "Region"))
 Preview the first N rows without loading the entire file:
 
 ``` r
+
 df <- read_qvd("Sales.qvd", n_max = 1000)
 ```
 
 ### Suppressing progress output
 
 ``` r
+
 df <- read_qvd("Sales.qvd", verbose = FALSE)
 ```
 
@@ -72,6 +77,7 @@ KB), making them very fast even for large files:
 ### List field names
 
 ``` r
+
 qvd_fields("Sales.qvd")
 #> [1] "SalesDate"  "ProductID"  "Region"     "Amount"     "Quantity"
 ```
@@ -79,6 +85,7 @@ qvd_fields("Sales.qvd")
 ### Full metadata
 
 ``` r
+
 meta <- qvd_metadata("Sales.qvd")
 meta$n_records
 #> [1] 4823917
@@ -96,6 +103,7 @@ meta$fields
 ### Schema with R types and distinct counts
 
 ``` r
+
 schema <- qvd_schema("Sales.qvd")
 print(schema)
 #> # A tibble: 5 × 6
@@ -117,6 +125,7 @@ print(schema)
 Useful for quick inspection or when you want to handle types yourself:
 
 ``` r
+
 df <- read_qvd("Sales.qvd", numeric_as_num = FALSE)
 # All columns are character
 ```
@@ -124,6 +133,7 @@ df <- read_qvd("Sales.qvd", numeric_as_num = FALSE)
 ### Keep integers as double
 
 ``` r
+
 df <- read_qvd("Sales.qvd", int_as_int = FALSE)
 # Integer fields returned as double instead
 ```
@@ -137,6 +147,7 @@ numbers). `qvdr` automatically converts fields tagged `$date` to R
 `Date` objects and `$timestamp` fields to `POSIXct`:
 
 ``` r
+
 df <- read_qvd("Orders.qvd")
 class(df$OrderDate)
 #> [1] "Date"
