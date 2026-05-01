@@ -80,11 +80,12 @@ parse_qvd_symbols <- function(con, fields, symbol_byte_size,
     # Determine the dominant type for this field
     dominant <- determine_dominant_type(types, f)
 
-    if (dominant == "integer" && int_as_int) {
+    # Treat DUAL types as their underlying numeric type
+    if (dominant %in% c("integer", "dual_int") && int_as_int) {
       result[[i]] <- int_vals
 
-    } else if (dominant == "double" && numeric_as_num) {
-      # For DUAL types, prefer the double value
+    } else if (dominant %in% c("double", "dual_dbl") && numeric_as_num) {
+      # For DUAL types, prefer the numeric value (int or double)
       vec <- ifelse(is.na(dbl_vals) & !is.na(int_vals),
                     as.double(int_vals),
                     dbl_vals)
