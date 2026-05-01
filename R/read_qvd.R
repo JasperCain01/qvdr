@@ -87,7 +87,11 @@ read_qvd <- function(path,
     int_as_int     = int_as_int
   )
 
-  # 3. Parse data section -----------------------------------------------------
+  # 3. Parse data section -----
+  # IMPORTANT: Pass numeric_as_num to parse_qvd_data so it can honor the user's request.
+  # The numeric_as_num flag controls whether character strings are coerced to numeric.
+  # This must be passed through the entire call chain (parse_qvd_data → map_indices_to_symbols
+  # → coerce_column) to ensure all columns are returned as character when numeric_as_num=FALSE.
   df <- parse_qvd_data(
     con          = con,
     header       = header,

@@ -248,7 +248,7 @@ encode_records <- function(index_mat, bit_widths, n_records, record_byte_size) {
       byte_pos <- row_start_byte + bit_cursor %/% 8L
       bit_pos  <- bit_cursor %% 8L
 
-      # Write bits into buffer (little-endian)
+      # Write bits into buffer (little-endian bit order)
       remaining <- bw
       val       <- stored
       bp        <- bit_pos
@@ -256,6 +256,10 @@ encode_records <- function(index_mat, bit_widths, n_records, record_byte_size) {
       while (remaining > 0L) {
         bits_in_this_byte <- min(remaining, 8L - bp)
         mask_val          <- bitwAnd(val, bitwShiftL(1L, bits_in_this_byte) - 1L)
+        # IMPORTANT: Wrap the bitwOr() result with as.raw(). The bitwise OR operation
+        # combines the existing byte value with the new bits, but bitwOr() returns an integer.
+        # We must convert to raw before assigning to a raw vector, otherwise R will raise:
+        # "incompatible types (from integer to raw) in subassignment type fix"
         buf[byte_pos + 1L] <- as.raw(bitwOr(
           as.integer(buf[byte_pos + 1L]),
           as.integer(as.raw(bitwShiftL(mask_val, bp)))

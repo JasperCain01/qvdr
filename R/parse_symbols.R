@@ -77,16 +77,24 @@ parse_qvd_symbols <- function(con, fields, symbol_byte_size,
       next
     }
 
-    # Determine the dominant type for this field
+    # Determine the dominant type for this field based on symbol types present and field metadata
     dominant <- determine_dominant_type(types, f)
 
-    # Treat DUAL types as their underlying numeric type
-    # When numeric_as_num = FALSE, return all numeric columns as character (per docstring)
+    # DUAL symbol types (0x05 = DUAL_INT, 0x06 = DUAL_DBL) store both a numeric value and
+    # a display string (e.g., for currency: numeric 1.0 with display "£1.00"). The determine_dominant_type
+    # function correctly identifies these as "dual_int" or "dual_dbl", but they need to be routed
+    # to their numeric paths here, not the string path. This ensures fields with DUAL symbols return
+    # their actual numeric values, not the display strings.
+    # Also note: When numeric_as_num = FALSE, we skip the numeric path entirely to preserve
+    # the docstring promise that "all columns are returned as character".
     if (dominant %in% c("integer", "dual_int") && int_as_int && numeric_as_num) {
+      # Integer or DUAL_INT with numeric interpretation enabled
       result[[i]] <- int_vals
 
     } else if (dominant %in% c("double", "dual_dbl") && numeric_as_num) {
-      # For DUAL types, prefer the numeric value (int or double)
+      # Double or DUAL_DBL: prefer the double value, but fall back to converting int to double
+      # if double is missing (can happen with mixed DUAL_INT/DUAL_DBL in the same field).
+      # This handles the common case where DUAL_INT fields store integers but we want them as doubles.
       vec <- ifelse(is.na(dbl_vals) & !is.na(int_vals),
                     as.double(int_vals),
                     dbl_vals)

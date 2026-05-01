@@ -76,7 +76,12 @@ parse_qvd_header <- function(con) {
   )
 
   # ---- Top-level metadata ----
-  # Search from root element to find direct children (avoids matching nested per-field elements)
+  # IMPORTANT: Extract root element before defining xtext helper.
+  # This ensures XPath queries like "Offset" match only direct children of <QvdTableHeader>,
+  # not nested elements within <QvdFieldHeader>. This is critical because real QlikSense
+  # QVD files place <Fields> before <Offset> in document order, so using ".//Offset" on
+  # the full document would incorrectly return the first per-field offset (0) instead of
+  # the top-level offset (size of symbol section, e.g., 764).
   root <- xml2::xml_root(doc)
   xtext <- function(xpath) {
     node <- xml2::xml_find_first(root, xpath)
@@ -85,9 +90,12 @@ parse_qvd_header <- function(con) {
   }
 
   table_name       <- xtext("TableName")
+  # Try CreateUtcTime first (used by real QlikSense), fall back to CreatedDate (used by synthetic test files)
   created_date     <- xtext("CreateUtcTime") %||% xtext("CreatedDate")
   n_records        <- as.integer(xtext("NoOfRecords"))
   record_byte_size <- as.integer(xtext("RecordByteSize"))
+  # The <Offset> element under root is the byte offset where the data section begins,
+  # which equals the size of the symbol section (data starts right after symbols)
   symbol_byte_size <- as.integer(xtext("Offset"))
 
   # ---- Field metadata ----
@@ -107,22 +115,27 @@ parse_qvd_header <- function(con) {
     tags_nodes <- xml2::xml_find_all(f, ".//Tags/String")
     tags       <- if (length(tags_nodes) > 0) xml2::xml_text(tags_nodes) else character(0)
 
-    # Type can be stored as direct child (test files) or in NumberFormat/Type (real QVDs)
+    # Field type location varies between synthetic test files and real QlikSense QVDs:
+    # - Test files (from write_test_qvd): <Type>INTEGER</Type> as direct child of QvdFieldHeader
+    # - Real Qlik QVDs: <Type>DATE</Type> nested within <NumberFormat>
+    # We try the direct child first, then fall back to the nested path. This ensures
+    # determine_dominant_type() can use the explicit field type when available, improving
+    # type dispatch reliability for edge cases where tags are ambiguous.
     type_raw <- ftext(f, "Type")
     if (is.na(type_raw)) type_raw <- ftext(f, "NumberFormat/Type")
 
     list(
       name             = ftext(f, "FieldName"),
-      bit_offset       = as.integer(ftext(f, "BitOffset")),
-      bit_width        = as.integer(ftext(f, "BitWidth")),
-      bias             = as.integer(ftext(f, "Bias")),
-      num_symbols      = as.integer(ftext(f, "NoOfSymbols")),
-      offset           = as.integer(ftext(f, "Offset")),   # byte offset in symbol section
-      length           = as.integer(ftext(f, "Length")),   # byte length in symbol section
-      type             = type_raw,                          # "ASCII", "INTEGER", "REAL", etc.
-      tags             = tags,                              # e.g. "$date", "$timestamp"
-      number_format    = ftext(f, "NumberFormat/Type"),
-      has_undefined    = identical(ftext(f, "HasUndefined"), "true")
+      bit_offset       = as.integer(ftext(f, "BitOffset")),    # bit position within each record
+      bit_width        = as.integer(ftext(f, "BitWidth")),     # bits allocated to this field
+      bias             = as.integer(ftext(f, "Bias")),         # index adjustment (usually -1 for null sentinel)
+      num_symbols      = as.integer(ftext(f, "NoOfSymbols")),  # count of distinct values in symbol table
+      offset           = as.integer(ftext(f, "Offset")),       # byte offset within symbol section
+      length           = as.integer(ftext(f, "Length")),       # byte length of symbols for this field
+      type             = type_raw,                              # "ASCII", "INTEGER", "REAL", "DATE", "TIMESTAMP", etc.
+      tags             = tags,                                  # semantic tags: "$date", "$timestamp", "$numeric", "$integer", etc.
+      number_format    = ftext(f, "NumberFormat/Type"),         # display format type
+      has_undefined    = identical(ftext(f, "HasUndefined"), "true")  # whether field can contain null values
     )
   })
 

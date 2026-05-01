@@ -12,11 +12,16 @@
 
 #' Parse the QVD data section into a data frame
 #'
+#' Decodes the bit-packed record matrix by extracting field indices for each record,
+#' mapping them to their symbol values, and applying type coercion based on field metadata.
+#'
 #' @param con          Open binary connection at the start of the data section.
 #' @param header       Parsed header from `parse_qvd_header()`.
 #' @param symbol_table Named list of symbol vectors from `parse_qvd_symbols()`.
 #' @param col_select   Character vector of column names to return, or NULL for all.
-#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
+#' @param numeric_as_num Logical (default TRUE); if FALSE, don't coerce character strings to numeric.
+#'                      This parameter is passed to coerce_column to honor the promise that
+#'                      numeric_as_num=FALSE returns all columns as character.
 #' @param verbose      Logical; print progress bar.
 #' @return A tibble.
 #' @keywords internal
@@ -100,11 +105,17 @@ parse_qvd_data <- function(con, header, symbol_table,
 
 #' Map integer indices to symbol values with type coercion
 #'
-#' @param indices Integer vector of 1-based symbol indices (NA = null).
-#' @param syms    Symbol vector for this field.
-#' @param field   Field metadata list.
-#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
-#' @return A typed R vector.
+#' Converts the bit-extracted 1-based indices into actual symbol values by indexing into
+#' the symbol vector, then applies type coercion (e.g., string to Date, string to numeric).
+#'
+#' @param indices Integer vector of 1-based symbol indices (NA = null/missing values).
+#' @param syms    Symbol vector for this field (already typed by parse_qvd_symbols).
+#' @param field   Field metadata list (from parse_qvd_header).
+#' @param numeric_as_num Logical (default TRUE); if FALSE, don't coerce character strings to numeric.
+#'                      This parameter must be passed through to coerce_column to prevent
+#'                      unwanted auto-conversion (e.g., "£1.00" → 1.00) when the user
+#'                      explicitly requested all columns as character.
+#' @return A typed R vector (integer, double, Date, POSIXct, or character).
 #' @keywords internal
 map_indices_to_symbols <- function(indices, syms, field, numeric_as_num = TRUE) {
   if (length(syms) == 0L) {
@@ -125,48 +136,63 @@ map_indices_to_symbols <- function(indices, syms, field, numeric_as_num = TRUE) 
 }
 
 
-#' Coerce a raw symbol vector to its appropriate R type
+#' Coerce a symbol vector to its appropriate R type
 #'
-#' Uses QVD field metadata (type, tags, number_format) to produce the most
-#' appropriate R type: integer, double, Date, POSIXct, or character.
+#' Applies semantic type conversions based on QVD field metadata:
+#' - Numeric fields with $date tag → Date class (stores days since 1899-12-30)
+#' - Numeric fields with $timestamp tag → POSIXct class (stores days + fraction)
+#' - Character fields that parse as dates → Date class
+#' - Character numeric fields (when numeric_as_num=TRUE) → numeric class
+#'
+#' The numeric_as_num parameter is critical: it controls whether character strings
+#' representing numbers should be converted to numeric types. When FALSE, this function
+#' respects the user's request to keep all columns as character (per read_qvd docstring).
 #'
 #' @param vec   Vector of raw symbol values (integer, double, or character).
-#' @param field Field metadata list.
-#' @param numeric_as_num Logical; if FALSE, don't coerce character to numeric.
-#' @return A typed R vector.
+#' @param field Field metadata list from parse_qvd_header.
+#' @param numeric_as_num Logical (default TRUE). If TRUE, character strings representing
+#'                      numbers are converted to numeric. If FALSE, they are kept as strings.
+#'                      Example: numeric_as_num=FALSE keeps "100.5" as character instead of 100.5.
+#' @return A typed R vector (integer, double, Date, POSIXct, or character).
 #' @keywords internal
 coerce_column <- function(vec, field, numeric_as_num = TRUE) {
   tags   <- field$tags   %||% character(0)
   qtype  <- field$type   %||% ""
   nfmt   <- field$number_format %||% ""
 
-  # Already typed from symbol parsing
+  # Already typed from symbol parsing (int/double case)
   if (is.integer(vec) || is.double(vec)) {
-    # Date: Qlik stores dates as days since 1899-12-30 (Excel epoch)
+    # Date: Qlik stores dates as days since 1899-12-30 (Excel epoch, a historical spreadsheet convention)
     if ("$date" %in% tags || isTRUE(nfmt == "DATE")) {
       return(as.Date(vec, origin = "1899-12-30"))
     }
     # Timestamp: days + fraction of day since 1899-12-30
+    # Multiply by 86400 to convert decimal days to seconds from Unix epoch
     if ("$timestamp" %in% tags || isTRUE(nfmt == "TIMESTAMP")) {
       secs <- as.double(vec) * 86400
       return(as.POSIXct(secs, origin = "1899-12-30", tz = "UTC"))
     }
-    # Time: fraction of day
+    # Time: fraction of day (e.g., 0.5 = noon, 1.0 = end of day)
     if ("$time" %in% tags || isTRUE(nfmt == "TIME")) {
-      return(as.double(vec) * 86400)  # seconds since midnight
+      return(as.double(vec) * 86400)  # convert to seconds since midnight
     }
     return(vec)
   }
 
   # Character vector: attempt smart coercion
   if (is.character(vec)) {
-    # Explicit date/time from tags on a string field
+    # Explicit date from tags: try parsing with common date formats
     if ("$date" %in% tags) {
       parsed <- as.Date(vec, tryFormats = c("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"))
       if (mean(is.na(parsed)) <= 0.1) return(parsed)  # allow 10% parse failures
     }
 
-    # Try numeric coercion for numeric QVD types stored as string (only if numeric_as_num = TRUE)
+    # Try numeric coercion for numeric QVD types stored as string.
+    # CRITICAL: This only happens if numeric_as_num=TRUE, respecting the user's explicit request.
+    # When numeric_as_num=FALSE, all columns stay as character per the read_qvd() docstring promise.
+    # Examples:
+    #   - qtype="REAL" with "100.5" → numeric 100.5 (if numeric_as_num=TRUE)
+    #   - qtype="MONEY" with "£1.00" → no numeric conversion anyway (£ prevents parsing)
     if (numeric_as_num && qtype %in% c("INTEGER", "REAL", "FIX", "MONEY")) {
       num <- suppressWarnings(as.numeric(vec))
       if (mean(is.na(num)) <= mean(is.na(vec))) return(num)
