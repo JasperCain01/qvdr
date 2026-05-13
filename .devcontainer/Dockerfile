@@ -1,7 +1,7 @@
 # Base image: rocker/verse supplies R 4.4, tidyverse, knitr, rmarkdown, and
 # quarto in a single Ubuntu 22.04 layer — appropriate because this package's
 # DESCRIPTION Suggests knitr + rmarkdown for its vignette.
-FROM rocker/verse:4.4
+FROM rocker/verse:latest
 
 # ---------------------------------------------------------------------------
 # System libraries
