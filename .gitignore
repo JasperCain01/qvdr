@@ -12,3 +12,5 @@ src/*.dll
 /Meta/
 /docs/
 inst/doc
+.claude
+
