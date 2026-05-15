@@ -4,19 +4,25 @@
 \alias{map_indices_to_symbols}
 \title{Map integer indices to symbol values with type coercion}
 \usage{
-map_indices_to_symbols(indices, syms, field)
+map_indices_to_symbols(indices, syms, field, numeric_as_num = TRUE)
 }
 \arguments{
-\item{indices}{Integer vector of 1-based symbol indices (NA = null).}
+\item{indices}{Integer vector of 1-based symbol indices (NA = null/missing values).}
 
-\item{syms}{Symbol vector for this field.}
+\item{syms}{Symbol vector for this field (already typed by parse_qvd_symbols).}
 
-\item{field}{Field metadata list.}
+\item{field}{Field metadata list (from parse_qvd_header).}
+
+\item{numeric_as_num}{Logical (default TRUE); if FALSE, don't coerce character strings to numeric.
+This parameter must be passed through to coerce_column to prevent
+unwanted auto-conversion (e.g., "£1.00" → 1.00) when the user
+explicitly requested all columns as character.}
 }
 \value{
-A typed R vector.
+A typed R vector (integer, double, Date, POSIXct, or character).
 }
 \description{
-Map integer indices to symbol values with type coercion
+Converts the bit-extracted 1-based indices into actual symbol values by indexing into
+the symbol vector, then applies type coercion (e.g., string to Date, string to numeric).
 }
 \keyword{internal}

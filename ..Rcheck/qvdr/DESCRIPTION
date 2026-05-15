@@ -1,0 +1,26 @@
+Package: qvdr
+Title: Read QVD Files from QlikView and Qlik Sense
+Version: 0.1.0
+Authors@R: person("Jasper", "Cain", email = "jcainsecondemail@gmail.com",
+    role = c("aut", "cre"))
+Author: Jasper Cain [aut, cre]
+Maintainer: Jasper Cain <jcainsecondemail@gmail.com>
+Description: Reads QVD (QlikView Data) binary files into R data frames or
+    tibbles. QVD is a proprietary binary format used by QlikView and Qlik Sense
+    for high-performance data storage. This package parses the XML header,
+    symbol table, and bit-stuffed record matrix, with a high-performance C++
+    backend via Rcpp for fast bit extraction. Supports all symbol types
+    including integers, doubles, strings, and dual values.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+LinkingTo: Rcpp
+Imports: Rcpp (>= 1.0.7), xml2 (>= 1.3.0), tibble (>= 3.0.0), cli (>=
+        3.0.0), rlang (>= 1.0.0)
+Suggests: testthat (>= 3.0.0), covr, knitr, rmarkdown, dplyr, bench
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+URL: https://github.com/JasperCain01/qvdr
+BugReports: https://github.com/JasperCain01/qvdr/issues
+Built: R 4.5.1; aarch64-apple-darwin20; 2026-05-15 10:26:59 UTC; unix

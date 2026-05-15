@@ -48,13 +48,13 @@ completes in 1–3 seconds on a modern machine.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/yourname/qvdr}
-  \item Report bugs at \url{https://github.com/yourname/qvdr/issues}
+  \item \url{https://github.com/JasperCain01/qvdr}
+  \item Report bugs at \url{https://github.com/JasperCain01/qvdr/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Your Name \email{you@example.com} (\href{https://orcid.org/0000-0000-0000-0000}{ORCID})
+\strong{Maintainer}: Jasper Cain \email{jcainsecondemail@gmail.com}
 
 }
 \keyword{internal}

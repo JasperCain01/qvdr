@@ -36,21 +36,20 @@ parse_qvd_data <- function(con, header, symbol_table,
 
   # Filter fields early if col_select is specified
   if (!is.null(col_select)) {
-    field_names <- sapply(fields, `[[`, "name")
+    field_names <- vapply(fields, `[[`, character(1L), "name")
     keep        <- field_names %in% col_select
     if (!any(keep)) {
       cli::cli_abort(
-        "None of the requested columns ({paste(col_select, collapse=', ')}) \\
-         exist in the QVD file."
+        "None of the requested columns {.val {col_select}} exist in the QVD file."
       )
     }
     fields       <- fields[keep]
-    symbol_table <- symbol_table[sapply(fields, `[[`, "name")]
+    symbol_table <- symbol_table[vapply(fields, `[[`, character(1L), "name")]
   }
 
   if (n_records == 0L) {
     empty <- lapply(fields, function(f) character(0))
-    names(empty) <- sapply(fields, `[[`, "name")
+    names(empty) <- vapply(fields, `[[`, character(1L), "name")
     return(tibble::as_tibble(empty))
   }
 
@@ -59,7 +58,7 @@ parse_qvd_data <- function(con, header, symbol_table,
   raw_data <- readBin(con, raw(), n = total_data_bytes)
 
   if (length(raw_data) < total_data_bytes) {
-    cli::cli_alert_warning(
+    cli::cli_warn(
       "Data section shorter than expected ({length(raw_data)} vs \\
        {total_data_bytes} bytes)."
     )
@@ -69,7 +68,7 @@ parse_qvd_data <- function(con, header, symbol_table,
   # Extract each field's indices via C++, then map to symbol values
   n_fields <- length(fields)
   result   <- vector("list", n_fields)
-  names(result) <- sapply(fields, `[[`, "name")
+  names(result) <- vapply(fields, `[[`, character(1L), "name")
 
   if (verbose && n_fields > 3L) {
     pb <- cli::cli_progress_bar("Decoding fields", total = n_fields)
@@ -190,12 +189,9 @@ coerce_column <- function(vec, field, numeric_as_num = TRUE) {
     # Try numeric coercion for numeric QVD types stored as string.
     # CRITICAL: This only happens if numeric_as_num=TRUE, respecting the user's explicit request.
     # When numeric_as_num=FALSE, all columns stay as character per the read_qvd() docstring promise.
-    # Examples:
-    #   - qtype="REAL" with "100.5" → numeric 100.5 (if numeric_as_num=TRUE)
-    #   - qtype="MONEY" with "£1.00" → no numeric conversion anyway (£ prevents parsing)
     if (numeric_as_num && qtype %in% c("INTEGER", "REAL", "FIX", "MONEY")) {
-      num <- suppressWarnings(as.numeric(vec))
-      if (mean(is.na(num)) <= mean(is.na(vec))) return(num)
+      num <- as.numeric(vec)
+      if (sum(is.na(num)) == sum(is.na(vec))) return(num)
     }
 
     return(vec)

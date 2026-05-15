@@ -37,29 +37,19 @@ parse_qvd_symbols <- function(con, fields, symbol_byte_size,
   raw_sym <- readBin(con, raw(), n = symbol_byte_size)
 
   if (length(raw_sym) < symbol_byte_size) {
-    cli::cli_alert_warning(
+    cli::cli_warn(
       "Symbol section shorter than expected ({length(raw_sym)} vs {symbol_byte_size} bytes). \\
        File may be truncated."
     )
   }
 
-  # Guard: ensure C++ functions are available (requires Rcpp::compileAttributes()
-  # to have been run and the package reloaded).
-  if (!exists("parse_symbol_section_cpp", mode = "function")) {
-    cli::cli_abort(c(
-      "C++ backend not found: {.fn parse_symbol_section_cpp} is missing.",
-      "i" = "Run {.code Rcpp::compileAttributes()} then {.code devtools::load_all()} to fix this.",
-      "i" = "{.file R/RcppExports.R} must be generated before the package can be used."
-    ))
-  }
-
   # Use the C++ parser to walk the raw bytes and extract per-field type info
-  num_symbols <- sapply(fields, `[[`, "num_symbols")
+  num_symbols <- vapply(fields, `[[`, integer(1L), "num_symbols")
   parsed      <- parse_symbol_section_cpp(raw_sym, as.integer(num_symbols))
 
   # Assemble typed vectors for each field
   result <- vector("list", length(fields))
-  names(result) <- sapply(fields, `[[`, "name")
+  names(result) <- vapply(fields, `[[`, character(1L), "name")
 
   for (i in seq_along(fields)) {
     f    <- fields[[i]]
@@ -95,9 +85,9 @@ parse_qvd_symbols <- function(con, fields, symbol_byte_size,
       # Double or DUAL_DBL: prefer the double value, but fall back to converting int to double
       # if double is missing (can happen with mixed DUAL_INT/DUAL_DBL in the same field).
       # This handles the common case where DUAL_INT fields store integers but we want them as doubles.
-      vec <- ifelse(is.na(dbl_vals) & !is.na(int_vals),
-                    as.double(int_vals),
-                    dbl_vals)
+      vec <- dbl_vals
+      fill <- is.na(dbl_vals) & !is.na(int_vals)
+      vec[fill] <- as.double(int_vals[fill])
       result[[i]] <- vec
 
     } else {

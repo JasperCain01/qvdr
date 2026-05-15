@@ -4,7 +4,14 @@
 \alias{parse_qvd_data}
 \title{Parse the QVD data section into a data frame}
 \usage{
-parse_qvd_data(con, header, symbol_table, col_select = NULL, verbose = TRUE)
+parse_qvd_data(
+  con,
+  header,
+  symbol_table,
+  col_select = NULL,
+  numeric_as_num = TRUE,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{con}{Open binary connection at the start of the data section.}
@@ -15,12 +22,17 @@ parse_qvd_data(con, header, symbol_table, col_select = NULL, verbose = TRUE)
 
 \item{col_select}{Character vector of column names to return, or NULL for all.}
 
+\item{numeric_as_num}{Logical (default TRUE); if FALSE, don't coerce character strings to numeric.
+This parameter is passed to coerce_column to honor the promise that
+numeric_as_num=FALSE returns all columns as character.}
+
 \item{verbose}{Logical; print progress bar.}
 }
 \value{
 A tibble.
 }
 \description{
-Parse the QVD data section into a data frame
+Decodes the bit-packed record matrix by extracting field indices for each record,
+mapping them to their symbol values, and applying type coercion based on field metadata.
 }
 \keyword{internal}

@@ -1,0 +1,21 @@
+* installing *source* package ‘qvdr’ ...
+** this is package ‘qvdr’ version ‘0.1.0’
+** using staged installation
+** libs
+using C++ compiler: ‘Apple clang version 17.0.0 (clang-1700.6.3.2)’
+using C++14
+using SDK: ‘MacOSX26.2.sdk’
+make: Nothing to be done for `all'.
+make: `symbols.rds' is up to date.
+installing to /Users/jasper/Documents/Coding/R Projects/qvdr/..Rcheck/00LOCK-qvdr/00new/qvdr/libs
+** R
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (qvdr)

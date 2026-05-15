@@ -74,7 +74,7 @@ read_qvd <- function(path,
   if (header$n_records == 0L) {
     cli::cli_alert_warning("QVD file contains no records.")
     empty <- lapply(header$fields, function(f) character(0))
-    names(empty) <- sapply(header$fields, `[[`, "name")
+    names(empty) <- vapply(header$fields, `[[`, character(1L), "name")
     return(tibble::as_tibble(empty))
   }
 
@@ -150,11 +150,11 @@ qvd_metadata <- function(path) {
   header <- parse_qvd_header(con)
 
   fields_df <- data.frame(
-    name        = sapply(header$fields, `[[`, "name"),
-    type        = sapply(header$fields, function(f) f$type %||% NA_character_),
-    tags        = sapply(header$fields, function(f) paste(f$tags, collapse = ", ")),
-    num_symbols = sapply(header$fields, `[[`, "num_symbols"),
-    bit_width   = sapply(header$fields, `[[`, "bit_width"),
+    name        = vapply(header$fields, `[[`, character(1L), "name"),
+    type        = vapply(header$fields, function(f) f$type %||% NA_character_, character(1L)),
+    tags        = vapply(header$fields, function(f) paste(f$tags, collapse = ", "), character(1L)),
+    num_symbols = vapply(header$fields, `[[`, integer(1L), "num_symbols"),
+    bit_width   = vapply(header$fields, `[[`, integer(1L), "bit_width"),
     stringsAsFactors = FALSE
   )
 
@@ -218,19 +218,12 @@ qvd_schema <- function(path) {
     symbol_byte_size = header$symbol_byte_size
   )
 
-  rows <- lapply(seq_along(header$fields), function(i) {
-    f    <- header$fields[[i]]
-    syms <- symbol_table[[f$name]]
-    list(
-      name       = f$name,
-      r_type     = class(syms)[1],
-      qvd_type   = f$type %||% NA_character_,
-      tags       = paste(f$tags, collapse = ", "),
-      n_distinct = length(syms),
-      bit_width  = f$bit_width
-    )
-  })
-
-  tibble::as_tibble(do.call(rbind, lapply(rows, as.data.frame,
-                                          stringsAsFactors = FALSE)))
+  tibble::tibble(
+    name       = vapply(seq_along(header$fields), function(i) header$fields[[i]]$name, character(1L)),
+    r_type     = vapply(seq_along(header$fields), function(i) class(symbol_table[[header$fields[[i]]$name]])[1], character(1L)),
+    qvd_type   = vapply(header$fields, function(f) f$type %||% NA_character_, character(1L)),
+    tags       = vapply(header$fields, function(f) paste(f$tags, collapse = ", "), character(1L)),
+    n_distinct = vapply(seq_along(header$fields), function(i) length(symbol_table[[header$fields[[i]]$name]]), integer(1L)),
+    bit_width  = vapply(header$fields, `[[`, integer(1L), "bit_width")
+  )
 }

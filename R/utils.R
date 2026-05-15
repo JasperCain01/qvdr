@@ -20,7 +20,7 @@ validate_qvd_path <- function(path) {
   }
   ext <- tolower(tools::file_ext(path))
   if (ext != "qvd") {
-    cli::cli_alert_warning(
+    cli::cli_warn(
       "{.file {basename(path)}} does not have a .qvd extension. \\
        Attempting to read anyway."
     )
@@ -52,6 +52,14 @@ format_bytes <- function(n) {
 }
 
 
+# QVD symbol type codes
+QVD_SYM_INT      <- 0x01L
+QVD_SYM_DBL      <- 0x02L
+QVD_SYM_STR      <- 0x04L
+QVD_SYM_DUAL_INT <- 0x05L
+QVD_SYM_DUAL_DBL <- 0x06L
+
+
 #' Write a synthetic QVD file for testing
 #'
 #' Creates a minimal but valid QVD binary file from a data frame. This is
@@ -79,7 +87,7 @@ write_test_qvd <- function(df, path, table_name = "TestTable") {
   for (j in seq_len(n_fields)) {
     col <- df[[j]]
     if (is.integer(col)) {
-      type_codes[j] <- 0x01L
+      type_codes[j] <- QVD_SYM_INT
       syms           <- sort(unique(col[!is.na(col)]))
       sym_list[[j]]  <- syms
       # Map values to 0-based indices; NA -> -1 (will use bias)
@@ -88,16 +96,15 @@ write_test_qvd <- function(df, path, table_name = "TestTable") {
       index_mat[, j]  <- idx
 
     } else if (is.numeric(col)) {
-      type_codes[j] <- 0x02L
-      syms           <- sort(unique(col[!is.finite(col) | !is.na(col)]))
-      syms           <- syms[is.finite(syms)]
+      type_codes[j] <- QVD_SYM_DBL
+      syms           <- sort(unique(col[is.finite(col)]))
       sym_list[[j]]  <- syms
       idx            <- match(col, syms) - 1L
       idx[is.na(idx)] <- -1L
       index_mat[, j]  <- idx
 
     } else {
-      type_codes[j] <- 0x04L
+      type_codes[j] <- QVD_SYM_STR
       col            <- as.character(col)
       syms           <- sort(unique(col[!is.na(col)]))
       sym_list[[j]]  <- syms
@@ -111,7 +118,7 @@ write_test_qvd <- function(df, path, table_name = "TestTable") {
   bit_widths <- sapply(sym_list, function(s) {
     n <- length(s) + 1L  # +1 for null sentinel
     if (n <= 1L) return(0L)
-    ceiling(log2(n + 1L))
+    ceiling(log2(n))
   })
 
   # ---- Serialise symbol section ----
@@ -141,16 +148,17 @@ write_test_qvd <- function(df, path, table_name = "TestTable") {
       "ASCII"
     )
     bit_offset_val <- boff
+    name_esc <- gsub("&", "&amp;", gsub("<", "&lt;", gsub(">", "&gt;", name)))
     sprintf(
       "    <QvdFieldHeader>\n      <FieldName>%s</FieldName>\n      <BitOffset>%d</BitOffset>\n      <BitWidth>%d</BitWidth>\n      <Bias>%d</Bias>\n      <NoOfSymbols>%d</NoOfSymbols>\n      <Offset>%d</Offset>\n      <Length>%d</Length>\n      <Type>%s</Type>\n      <Tags/>\n    </QvdFieldHeader>",
-      name, bit_offset_val, bw, bias, nsym, off, len, type_str
+      name_esc, bit_offset_val, bw, bias, nsym, off, len, type_str
     )
   },
     name  = field_names,
     boff  = c(0L, cumsum(bit_widths[-n_fields])),
     bw    = bit_widths,
     bias  = biases,
-    nsym  = sapply(sym_list, length),
+    nsym  = vapply(sym_list, length, integer(1L)),
     off   = field_sym_offsets,
     len   = field_sym_lengths,
     tc    = type_codes,
@@ -211,7 +219,7 @@ encode_symbols <- function(syms, type_code) {
 int32_to_raw <- function(x) {
   x  <- as.integer(x)
   buf <- raw(4)
-  for (i in 1:4) {
+  for (i in seq_len(4L)) {
     buf[i] <- as.raw(bitwAnd(x, 0xFFL))
     x <- bitwShiftR(x, 8L)
   }

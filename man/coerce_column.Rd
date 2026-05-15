@@ -2,20 +2,34 @@
 % Please edit documentation in R/parse_data.R
 \name{coerce_column}
 \alias{coerce_column}
-\title{Coerce a raw symbol vector to its appropriate R type}
+\title{Coerce a symbol vector to its appropriate R type}
 \usage{
-coerce_column(vec, field)
+coerce_column(vec, field, numeric_as_num = TRUE)
 }
 \arguments{
 \item{vec}{Vector of raw symbol values (integer, double, or character).}
 
-\item{field}{Field metadata list.}
+\item{field}{Field metadata list from parse_qvd_header.}
+
+\item{numeric_as_num}{Logical (default TRUE). If TRUE, character strings representing
+numbers are converted to numeric. If FALSE, they are kept as strings.
+Example: numeric_as_num=FALSE keeps "100.5" as character instead of 100.5.}
 }
 \value{
-A typed R vector.
+A typed R vector (integer, double, Date, POSIXct, or character).
 }
 \description{
-Uses QVD field metadata (type, tags, number_format) to produce the most
-appropriate R type: integer, double, Date, POSIXct, or character.
+Applies semantic type conversions based on QVD field metadata:
+\itemize{
+\item Numeric fields with $date tag → Date class (stores days since 1899-12-30)
+\item Numeric fields with $timestamp tag → POSIXct class (stores days + fraction)
+\item Character fields that parse as dates → Date class
+\item Character numeric fields (when numeric_as_num=TRUE) → numeric class
+}
+}
+\details{
+The numeric_as_num parameter is critical: it controls whether character strings
+representing numbers should be converted to numeric types. When FALSE, this function
+respects the user's request to keep all columns as character (per read_qvd docstring).
 }
 \keyword{internal}

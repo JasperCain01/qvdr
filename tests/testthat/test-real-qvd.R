@@ -6,7 +6,7 @@
 
 # Skip tests if the real QVD file doesn't exist
 test_that("read real QVD file from QlikSense", {
-  qvd_path <- "../../qcv_test_csv.qvd"
+  qvd_path <- testthat::test_path("testdata", "qcv_test_csv.qvd")
   skip_if_not(file.exists(qvd_path), "Real QVD test file not found")
 
   result <- read_qvd(qvd_path, verbose = FALSE)
@@ -27,7 +27,7 @@ test_that("read real QVD file from QlikSense", {
 })
 
 test_that("read real QVD has correct date values", {
-  qvd_path <- "../../qcv_test_csv.qvd"
+  qvd_path <- testthat::test_path("testdata", "qcv_test_csv.qvd")
   skip_if_not(file.exists(qvd_path), "Real QVD test file not found")
 
   result <- read_qvd(qvd_path, verbose = FALSE)
@@ -39,7 +39,7 @@ test_that("read real QVD has correct date values", {
 })
 
 test_that("read real QVD has correct numeric values", {
-  qvd_path <- "../../qcv_test_csv.qvd"
+  qvd_path <- testthat::test_path("testdata", "qcv_test_csv.qvd")
   skip_if_not(file.exists(qvd_path), "Real QVD test file not found")
 
   result <- read_qvd(qvd_path, verbose = FALSE)
@@ -53,7 +53,7 @@ test_that("read real QVD has correct numeric values", {
 })
 
 test_that("read real QVD has correct text values", {
-  qvd_path <- "../../qcv_test_csv.qvd"
+  qvd_path <- testthat::test_path("testdata", "qcv_test_csv.qvd")
   skip_if_not(file.exists(qvd_path), "Real QVD test file not found")
 
   result <- read_qvd(qvd_path, verbose = FALSE)
@@ -64,7 +64,7 @@ test_that("read real QVD has correct text values", {
 })
 
 test_that("read real QVD has correct timestamp values", {
-  qvd_path <- "../../qcv_test_csv.qvd"
+  qvd_path <- testthat::test_path("testdata", "qcv_test_csv.qvd")
   skip_if_not(file.exists(qvd_path), "Real QVD test file not found")
 
   result <- read_qvd(qvd_path, verbose = FALSE)
