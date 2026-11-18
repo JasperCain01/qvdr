@@ -1,81 +1,66 @@
 # tests/testthat/test-read_qvd.R
 # ---------------------------------------------------------------------------
-# Tests for the main read_qvd() function
+# read_qvd(): values, row order, column selection and row limits.
+# Fixtures are written by qvdr:::write_test_qvd(), so these tests prove the
+# reader and the package's own writer agree. Agreement with real Qlik output
+# is tested separately in test-real-qvd.R. See tests/TESTS.md.
 # ---------------------------------------------------------------------------
 
-test_that("read_qvd returns a tibble", {
+test_that("read_qvd returns the written table exactly: names, types, values and row order", {
   fix <- make_simple_qvd()
   on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_s3_class(result, "tbl_df")
-})
+  expect_identical(read_qvd(fix$path, verbose = FALSE), tibble::as_tibble(fix$data))
 
-test_that("read_qvd returns correct dimensions", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(nrow(result), nrow(fix$data))
-  expect_equal(ncol(result), ncol(fix$data))
-})
-
-test_that("read_qvd returns correct column names", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(names(result), names(fix$data))
-})
-
-test_that("read_qvd returns correct string values", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(as.character(result$Name), fix$data$Name)
-})
-
-test_that("read_qvd returns correct integer values", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(as.integer(result$ID), fix$data$ID)
-  expect_equal(as.integer(result$Score), fix$data$Score)
-})
-
-test_that("read_qvd handles double columns", {
   fix <- make_numeric_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(as.double(result$Amount), fix$data$Amount, tolerance = 1e-6)
-  expect_equal(as.double(result$Tax),    fix$data$Tax,    tolerance = 1e-6)
+  on.exit(unlink(fix$path), add = TRUE)
+  expect_identical(read_qvd(fix$path, verbose = FALSE), tibble::as_tibble(fix$data))
 })
 
-test_that("read_qvd handles NA values correctly", {
+test_that("NULL values come back as NA in the right cells, for strings and integers", {
   fix <- make_na_qvd()
   on.exit(unlink(fix$path))
   result <- read_qvd(fix$path, verbose = FALSE)
-  expect_true(is.na(result$Label[2]))
-  expect_true(is.na(result$Label[4]))
-  expect_true(is.na(result$Value[2]))
-  expect_true(is.na(result$Value[4]))
-  expect_false(is.na(result$Label[1]))
-  expect_false(is.na(result$Value[3]))
+  expect_identical(result$Label, c("A", NA, "C", NA, "E"))
+  expect_identical(result$Value, c(10L, NA, 30L, NA, 50L))
+
+  # A column that is entirely NULL still has the right length and type.
+  path <- tempfile(fileext = ".qvd")
+  on.exit(unlink(path), add = TRUE)
+  qvdr:::write_test_qvd(data.frame(X = rep(NA_character_, 3), stringsAsFactors = FALSE), path)
+  expect_identical(read_qvd(path, verbose = FALSE)$X, rep(NA_character_, 3))
 })
 
-test_that("read_qvd col_select returns subset of columns", {
+test_that("a large multi-column file round-trips exactly, including fields needing a >8-bit index", {
+  # 5,000 distinct IDs need a 13-bit symbol index, and the five fields share
+  # each record's bytes, so this exercises bit-unpacking across field and byte
+  # boundaries. Comparing without sorting catches rows decoded out of order.
+  fix <- make_large_qvd(n = 5000L)
+  on.exit(unlink(fix$path))
+  expect_identical(read_qvd(fix$path, verbose = FALSE), tibble::as_tibble(fix$data))
+})
+
+test_that("a field with a single distinct value (a zero-width index) is read for every row", {
+  path <- tempfile(fileext = ".qvd")
+  on.exit(unlink(path))
+  qvdr:::write_test_qvd(data.frame(X = rep("constant", 10L), stringsAsFactors = FALSE), path)
+  expect_identical(read_qvd(path, verbose = FALSE)$X, rep("constant", 10L))
+})
+
+test_that("col_select returns the requested columns in file row order, ignoring unknown names", {
   fix <- make_simple_qvd()
   on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, col_select = c("ID", "Name"), verbose = FALSE)
-  expect_equal(names(result), c("ID", "Name"))
-  expect_equal(nrow(result), nrow(fix$data))
+  expected <- tibble::as_tibble(fix$data)
+
+  expect_identical(read_qvd(fix$path, col_select = c("ID", "Name"), verbose = FALSE),
+                   expected[c("ID", "Name")])
+  expect_identical(read_qvd(fix$path, col_select = "Score", verbose = FALSE),
+                   expected["Score"])
+  # A mix of known and unknown names keeps the known ones.
+  expect_identical(read_qvd(fix$path, col_select = c("ID", "NonExistent"), verbose = FALSE),
+                   expected["ID"])
 })
 
-test_that("read_qvd col_select with single column", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, col_select = "Score", verbose = FALSE)
-  expect_equal(names(result), "Score")
-})
-
-test_that("read_qvd col_select errors on non-existent column", {
+test_that("col_select errors, naming the column, when nothing requested exists", {
   fix <- make_simple_qvd()
   on.exit(unlink(fix$path))
   expect_error(
@@ -84,73 +69,20 @@ test_that("read_qvd col_select errors on non-existent column", {
   )
 })
 
-test_that("read_qvd n_max limits rows returned", {
+test_that("n_max limits rows to the first n, keeping the schema even at zero", {
   fix <- make_simple_qvd()
   on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, n_max = 3L, verbose = FALSE)
-  expect_equal(nrow(result), 3L)
+  expected <- tibble::as_tibble(fix$data)
+  for (n in c(0L, 3L)) {
+    expect_identical(read_qvd(fix$path, n_max = n, verbose = FALSE), expected[seq_len(n), ],
+                     info = paste("n_max =", n))
+  }
+  # Asking for more rows than exist returns them all.
+  expect_identical(read_qvd(fix$path, n_max = 999L, verbose = FALSE), expected)
 })
 
-test_that("read_qvd n_max larger than file returns all rows", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, n_max = 999L, verbose = FALSE)
-  expect_equal(nrow(result), nrow(fix$data))
-})
-
-test_that("read_qvd handles single-column QVD", {
-  fix <- make_single_col_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(ncol(result), 1L)
-  expect_equal(as.character(result[[1]]), fix$data$OnlyCol)
-})
-
-test_that("read_qvd handles single-row QVD", {
-  fix <- make_single_row_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  expect_equal(nrow(result), 1L)
-  expect_equal(as.integer(result$A), 42L)
-  expect_equal(as.character(result$B), "hello")
-})
-
-test_that("read_qvd errors on non-existent file", {
-  expect_error(
-    read_qvd("/no/such/file.qvd"),
-    regexp = "not found"
-  )
-})
-
-test_that("read_qvd errors on non-character path", {
-  expect_error(read_qvd(123), regexp = "character")
-})
-
-test_that("read_qvd verbose = FALSE suppresses messages", {
+test_that("verbose = FALSE suppresses progress messages", {
   fix <- make_simple_qvd()
   on.exit(unlink(fix$path))
   expect_no_message(read_qvd(fix$path, verbose = FALSE))
-})
-
-test_that("read_qvd with numeric_as_num = FALSE returns all character", {
-  fix <- make_numeric_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, numeric_as_num = FALSE, verbose = FALSE)
-  # All columns should be character
-  types <- sapply(result, class)
-  expect_true(all(types == "character"))
-})
-
-test_that("read_qvd row values are in correct order", {
-  fix <- make_simple_qvd()
-  on.exit(unlink(fix$path))
-  result <- read_qvd(fix$path, verbose = FALSE)
-  # Row 1: ID=1, Name="Alice", Score=88
-  expect_equal(as.integer(result$ID[1]),    1L)
-  expect_equal(as.character(result$Name[1]), "Alice")
-  expect_equal(as.integer(result$Score[1]), 88L)
-  # Row 3: ID=3, Name="Charlie", Score=95
-  expect_equal(as.integer(result$ID[3]),    3L)
-  expect_equal(as.character(result$Name[3]), "Charlie")
-  expect_equal(as.integer(result$Score[3]), 95L)
 })
