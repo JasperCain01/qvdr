@@ -62,6 +62,11 @@ parse_qvd_header <- function(con) {
 
   # Strip null byte and trailing whitespace, convert to string
   xml_str <- rawToChar(raw_bytes[raw_bytes != as.raw(0x00)])
+  # QVD headers are UTF-8 (they declare it). rawToChar() returns the bytes
+  # marked as the session's native encoding, so without this a header with any
+  # non-ASCII text (a currency format, an accented field name) fails to parse,
+  # or is mis-decoded, under a non-UTF-8 locale.
+  Encoding(xml_str) <- "UTF-8"
 
   # Parse XML
   doc <- tryCatch(

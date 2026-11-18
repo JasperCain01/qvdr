@@ -1,6 +1,6 @@
 # What the tests protect
 
-There are 27 `test_that()` blocks in `tests/testthat/`. Run them with `devtools::test()`; they also run under `R CMD check` and the coverage workflow in CI.
+There are 28 `test_that()` blocks in `tests/testthat/`. Run them with `devtools::test()`; they also run under `R CMD check` and the coverage workflow in CI.
 
 ## Read this first: what these tests can and cannot prove
 
@@ -13,7 +13,7 @@ The writer also differs from Qlik in two known ways:
 
 Only `test-real-qvd.R`, which reads a 10-row file exported from QlikSense, checks the reader against reality. That file has no nulls, no field with more than 255 distinct values, and only the column types listed below. Real exports covering those cases are tracked in [issue #2](https://github.com/JasperCain01/qvdr/issues/2).
 
-**Locale:** `parse_qvd_header()` converts the header bytes to text in the session's locale. Under a non-UTF-8 locale (for example `LANG` unset on a Linux server), a header containing non-ASCII text fails to parse. The real fixture's `£` currency format triggers this. Run the suite under a UTF-8 locale; CI does. This is a package bug rather than a test problem, and `test-real-qvd.R` is the test that exposes it.
+**Locale:** QVD headers and text values are UTF-8, and the reader marks them as such, so files read the same under any locale. `test-edge-cases.R` checks this by switching to the `C` locale mid-test. (Before that fix, a non-UTF-8 locale broke the real fixture's header and left text values unmarked.)
 
 Severity describes what goes wrong for a user if the guarded behaviour breaks:
 
@@ -76,4 +76,5 @@ These are the most important tests in the package. They must never be skipped, a
 | a path that is not a single string is rejected | Non-character, `NULL` and multi-element paths fail with a clear message. | Low |
 | a QVD with a non-.qvd extension is read, with a warning | A misnamed file is still read rather than refused. | Medium |
 | a truncated or corrupt file never returns data without saying so | A real file cut short in the header or symbol table is an error; cut short in the data section, it warns and returns exactly the complete records; non-QVD bytes are an error. This pins today's contract, so a future change can't start returning partial or garbled data quietly. | High |
+| files read correctly under a non-UTF-8 locale | Under the `C` locale, the real file's header (with its `£` format) parses, and non-ASCII text values come back identical and marked UTF-8, so converting them to UTF-8 later can't garble them. Affects Linux servers without a UTF-8 `LANG`, and Windows with R before 4.2. | High |
 | format_bytes reports file sizes in the unit a person would use | The helper used in verbose output. | Low |

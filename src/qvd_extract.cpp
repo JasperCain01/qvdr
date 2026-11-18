@@ -113,7 +113,10 @@ CharacterVector parse_strings_cpp(RawVector raw_data, IntegerVector offsets) {
     for (int j = start; j < end; ++j) {
       s += (char)(unsigned char)raw_data[j];
     }
-    result[i] = s;
+    // QVD symbol strings are UTF-8. Mark them as such: an unmarked string is
+    // taken to be in the session's native encoding, which corrupts non-ASCII
+    // text under a non-UTF-8 locale (e.g. Windows with R < 4.2).
+    result[i] = Rcpp::String(s, CE_UTF8);
   }
 
   return result;
