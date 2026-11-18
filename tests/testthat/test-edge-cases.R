@@ -75,6 +75,33 @@ test_that("a truncated or corrupt file never returns data without saying so", {
   expect_error(read_qvd(junk, verbose = FALSE), "QVD XML header")
 })
 
+test_that("files read correctly under a non-UTF-8 locale", {
+  # QVD headers and text values are UTF-8. Decoding them as the session's
+  # native encoding broke reading under a non-UTF-8 locale (LANG unset on a
+  # Linux server, or Windows with R < 4.2): the real file's "£" number format
+  # made the header unparseable, and non-ASCII text values came back unmarked,
+  # so anything converting them to UTF-8 produced mojibake.
+  vals <- c("caf\u00e9", "\u00a3100", "na\u00efve", "plain")  # built while still UTF-8
+  path <- tempfile(fileext = ".qvd")
+  on.exit(unlink(path))
+  qvdr:::write_test_qvd(data.frame(X = vals, stringsAsFactors = FALSE), path)
+
+  old <- Sys.getlocale("LC_CTYPE")
+  on.exit(Sys.setlocale("LC_CTYPE", old), add = TRUE)
+  suppressWarnings(Sys.setlocale("LC_CTYPE", "C"))
+  skip_if(l10n_info()[["UTF-8"]], "could not switch to a non-UTF-8 locale")
+
+  result <- read_qvd(path, verbose = FALSE)$X
+  expect_identical(result, vals)
+  expect_identical(Encoding(result[1:3]), rep("UTF-8", 3))
+  expect_identical(enc2utf8(result), vals)
+
+  real <- read_qvd(testthat::test_path("testdata", "qcv_test_csv.qvd"), verbose = FALSE)
+  expect_equal(nrow(real), 10L)
+  expect_identical(Encoding(qvd_metadata(
+    testthat::test_path("testdata", "qcv_test_csv.qvd"))$raw_xml), "UTF-8")
+})
+
 test_that("format_bytes reports file sizes in the unit a person would use", {
   expect_equal(qvdr:::format_bytes(512L),        "512 B")
   expect_equal(qvdr:::format_bytes(2048L),       "2.0 KB")
